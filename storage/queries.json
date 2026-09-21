@@ -1,0 +1,13 @@
+[
+  {
+    "id": "q_1789972352010_un1h",
+    "timestamp": "2026-09-21T06:32:32.010Z",
+    "paper_id": "paper_1789927908284_fpzm",
+    "paper_title": "paper3",
+    "question": "author of paper",
+    "mode": "dynamic",
+    "answer_preview": "The authors of the paper \"Tender Coconut Classification using Decision Tree and Deep Learning Technique\" are:  *   **Ishani Bhat** *   **Umadevi V** *   **Nishc",
+    "latency_ms": 365,
+    "tokens": 1840
+  }
+]

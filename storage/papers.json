@@ -1,0 +1,50 @@
+[
+  {
+    "paper_id": "paper_1789911708499_0loc",
+    "title": "Kannada Word Detection in Heterogeneous Scene Images",
+    "filename": "paper4.pdf",
+    "file_size_kb": 486,
+    "content_hash": "038a1811017a065ba1daeab12142e6f49993ce285f0ec88efa6dcf5684c13ef6",
+    "is_preloaded": false,
+    "status": "ready",
+    "num_entities": 19,
+    "num_relations": 26,
+    "num_communities": 4
+  },
+  {
+    "paper_id": "paper_1789911695509_q87x",
+    "title": "A Comparative Analysis of Traditional Machine Learning, Deep Learning and Boosting Algorithms on Phishing URL Detection",
+    "filename": "paper5.pdf",
+    "file_size_kb": 316,
+    "content_hash": "9828ce4f2d7b9d57b5d482a28902c95142437e874211947c9be5dd2ecc722295",
+    "is_preloaded": false,
+    "status": "ready",
+    "num_entities": 21,
+    "num_relations": 28,
+    "num_communities": 5
+  },
+  {
+    "paper_id": "paper_1789911568626_3bmr",
+    "title": "Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods",
+    "filename": "paper1.pdf",
+    "file_size_kb": 967,
+    "content_hash": "37f1b9744970ccce6ae97e7791ab13d6957bc206f6eb9a42b73ec66b53e00e39",
+    "is_preloaded": false,
+    "status": "ready",
+    "num_entities": 23,
+    "num_relations": 31,
+    "num_communities": 5
+  },
+  {
+    "paper_id": "paper_1789927908284_fpzm",
+    "title": "paper3",
+    "filename": "paper3.pdf",
+    "file_size_kb": 315,
+    "content_hash": "9fb2c22a2e5ee473c47527d3537308646d58b99cdce76d60942275e41c4b2f34",
+    "is_preloaded": false,
+    "status": "ready",
+    "num_entities": 17,
+    "num_relations": 23,
+    "num_communities": 4
+  }
+]
