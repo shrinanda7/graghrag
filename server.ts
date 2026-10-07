@@ -11,7 +11,7 @@ import { ConfigState, Paper, TraversalStep, TraversalTrace } from "./src/types";
 import { GoogleGenAI } from "@google/genai";
 
 const app = express();
-const PORT = 3003;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
@@ -169,7 +169,7 @@ app.get("/api/papers", (req, res) => {
 });
 
 // File upload and extraction trigger with storage and deduplication
-app.post("/api/upload", upload.single("file"), (req, res) => {
+app.post("/api/upload", upload.single("file") as any, (req, res) => {
   try {
     const file = req.file;
     const preloadedId = req.body?.preloaded_id;
@@ -1294,11 +1294,10 @@ app.post("/api/query/stream", async (req, res) => {
       : prompt;
 
     const candidateModels = [
+      "gemini-3.8-flash",
+      "gemini-2.5-flash",
       "gemini-2.5-flash-lite",
       "gemini-3.1-flash-lite",
-      "gemini-3.7-flash",
-      "gemini-3.8-flash",
-      "gemini-3.6-flash",
     ];
     for (const model of candidateModels) {
       try {
