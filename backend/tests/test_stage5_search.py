@@ -82,3 +82,48 @@ async def test_local_search():
     assert res["mode"] == "local"
     assert "answer" in res
     assert "trace" in res
+
+@pytest.mark.asyncio
+async def test_missing_graph_causes_no_writes_and_no_llm_calls(monkeypatch):
+    """Confirm that a missing graph returns no_indexed_graph status with no graph writes and 0 LLM calls."""
+    unindexed_id = "missing_paper_unindexed_999"
+    # Ensure graph is empty before test
+    assert len(neo4j_store.get_paper_graph(unindexed_id)["nodes"]) == 0
+
+    res = await query_router.execute_query(
+        question="Explain the core mechanism of this unindexed paper.",
+        paper_id=unindexed_id,
+        paper_title="Unindexed Paper Title",
+        mode="ours"
+    )
+
+    # 1. Status must explicitly be no_indexed_graph
+    assert res["status"] == "no_indexed_graph"
+    assert "No indexed knowledge graph found" in res["answer"]
+
+    # 2. No LLM calls made
+    assert res["total_llm_calls"] == 0
+    assert res["total_tokens"] == 0
+
+    # 3. No graph writes occurred: no entities/edges created in Neo4j
+    post_check = neo4j_store.get_paper_graph(unindexed_id)
+    assert len(post_check["nodes"]) == 0
+    assert len(post_check["edges"]) == 0
+
+@pytest.mark.asyncio
+async def test_valid_indexed_paper_query_execution():
+    """Confirm that a valid, indexed paper executes normal query retrieval."""
+    res = await query_router.execute_query(
+        question="How does Multi-Head Attention relate to the Transformer architecture?",
+        paper_id="test_paper_stage5",
+        paper_title="Attention Is All You Need",
+        mode="ours"
+    )
+    assert res.get("status") != "no_indexed_graph"
+    assert "answer" in res
+    assert len(res["answer"]) > 0
+    assert "original_graph" in res
+    assert len(res["original_graph"]["nodes"]) > 0
+    assert "trace" in res
+    assert len(res["trace"]["steps"]) > 0
+

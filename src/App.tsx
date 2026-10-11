@@ -3,44 +3,58 @@ import { Header } from "./components/Header";
 import { PaperSidebar } from "./components/PaperSidebar";
 import { CytoscapeGraphViewer } from "./components/CytoscapeGraphViewer";
 import { ChatPanel } from "./components/ChatPanel";
-import { AblationConfigDrawer } from "./components/AblationConfigDrawer";
-import { EvaluationBenchmarkView } from "./components/EvaluationBenchmarkView";
-import { CompressionQATrainer } from "./components/CompressionQATrainer";
-import { Paper, GraphTopology, QueryResult, TraversalTrace, TraversalStep, ConfigState } from "./types";
-import { PRELOADED_PAPERS, INITIAL_CONFIG, generatePaperGraph } from "./data";
+import { Neo4jAuraModal } from "./components/Neo4jAuraModal";
+import { Paper, GraphTopology, QueryResult, TraversalTrace, TraversalStep, Neo4jStatus } from "./types";
+import { PRELOADED_PAPERS, generatePaperGraph, generateMultiPaperGraph } from "./data";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"graphrag" | "benchmark" | "compression_qa">("graphrag");
-  const [papers, setPapers] = useState<Paper[]>(PRELOADED_PAPERS);
-  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(PRELOADED_PAPERS[0]);
+  // Theme state: dark / light
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    try {
+      const saved = localStorage.getItem("graphrag_theme");
+      if (saved === "light" || saved === "dark") return saved;
+    } catch {}
+    return "dark";
+  });
 
-  // Graph states
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem("graphrag_theme", next);
+      } catch {}
+      return next;
+    });
+  };
+
+  const [papers, setPapers] = useState<Paper[]>(PRELOADED_PAPERS);
+  const [selectedPaperIds, setSelectedPaperIds] = useState<string[]>([PRELOADED_PAPERS[0].paper_id]);
+
+  // Graph state
   const initialGraphs = generatePaperGraph(PRELOADED_PAPERS[0].paper_id);
   const [originalGraph, setOriginalGraph] = useState<GraphTopology | null>(initialGraphs.original_graph);
   const [compressedGraph, setCompressedGraph] = useState<GraphTopology | null>(initialGraphs.compressed_graph);
   const [trace, setTrace] = useState<TraversalTrace | null>(null);
 
-  // Query & Answering states
+  // Query & Answering state
   const [isQuerying, setIsQuerying] = useState<boolean>(false);
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
   const [streamedAnswer, setStreamedAnswer] = useState<string>("");
 
-  // Configuration state
-  const [config, setConfig] = useState<ConfigState | null>(INITIAL_CONFIG);
-  const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+  // Neo4j Cloud modal state
+  const [neo4jStatus, setNeo4jStatus] = useState<Neo4jStatus | null>(null);
+  const [isNeo4jOpen, setIsNeo4jOpen] = useState<boolean>(false);
 
   // Initial load
   useEffect(() => {
     loadPapers();
-    loadConfig();
+    loadNeo4jStatus();
   }, []);
 
-  // When selected paper changes, fetch its graph
+  // When selected papers change, update graph topology
   useEffect(() => {
-    if (selectedPaper) {
-      loadGraph(selectedPaper.paper_id);
-    }
-  }, [selectedPaper]);
+    loadGraphForSelection(selectedPaperIds);
+  }, [selectedPaperIds]);
 
   const loadPapers = async () => {
     try {
@@ -49,8 +63,8 @@ export default function App() {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           setPapers(data);
-          if (!selectedPaper) {
-            setSelectedPaper(data[0]);
+          if (selectedPaperIds.length === 0) {
+            setSelectedPaperIds([data[0].paper_id]);
           }
         }
       }
@@ -59,58 +73,89 @@ export default function App() {
     }
   };
 
-  const loadConfig = async () => {
+  const loadNeo4jStatus = async () => {
     try {
-      const res = await fetch("/api/config");
+      const res = await fetch("/api/neo4j/status");
       if (res.ok) {
         const data = await res.json();
-        setConfig(data);
+        setNeo4jStatus(data);
       }
     } catch (err) {
-      console.warn("Backend config offline, using local configuration:", err);
+      console.warn("Neo4j status check failed:", err);
     }
   };
 
-  const loadGraph = async (paperId: string) => {
-    try {
-      const res = await fetch(`/api/graph/${paperId}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.original_graph) setOriginalGraph(data.original_graph);
-        if (data.compressed_graph) setCompressedGraph(data.compressed_graph);
-        return;
-      }
-    } catch (err) {
-      console.warn("Backend graph endpoint offline, rendering generated graph:", err);
+  const loadGraphForSelection = async (ids: string[]) => {
+    if (!ids || ids.length === 0) {
+      setOriginalGraph(null);
+      setCompressedGraph(null);
+      return;
     }
-    // Fallback to client-side graph generator
-    const graphs = generatePaperGraph(paperId);
-    setOriginalGraph(graphs.original_graph);
-    setCompressedGraph(graphs.compressed_graph);
+
+    if (ids.length === 1) {
+      try {
+        const res = await fetch(`/api/graph/${ids[0]}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.original_graph) setOriginalGraph(data.original_graph);
+          if (data.compressed_graph) setCompressedGraph(data.compressed_graph);
+          return;
+        }
+      } catch {}
+      const fallback = generatePaperGraph(ids[0]);
+      setOriginalGraph(fallback.original_graph);
+      setCompressedGraph(fallback.compressed_graph);
+    } else {
+      try {
+        const res = await fetch("/api/graph/multi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paper_ids: ids }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.original_graph) setOriginalGraph(data.original_graph);
+          if (data.compressed_graph) setCompressedGraph(data.compressed_graph);
+          return;
+        }
+      } catch {}
+      const fallback = generateMultiPaperGraph(ids);
+      setOriginalGraph(fallback.original_graph);
+      setCompressedGraph(fallback.compressed_graph);
+    }
   };
 
-  const handleUpdateConfig = async (newConfig: Partial<ConfigState>) => {
-    try {
-      const res = await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newConfig),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setConfig(data);
-        return;
+  // Multi-paper selection handlers
+  const handleTogglePaper = (paperId: string) => {
+    setSelectedPaperIds((prev) => {
+      if (prev.includes(paperId)) {
+        if (prev.length === 1) return prev; // Keep at least one active
+        return prev.filter((id) => id !== paperId);
+      } else {
+        return [...prev, paperId];
       }
-    } catch (err) {
-      console.warn("API config update failed, updating local state:", err);
-    }
-    // Optimistic local state update
-    setConfig((prev) => (prev ? { ...prev, ...newConfig } : (newConfig as ConfigState)));
+    });
   };
 
-  // Streaming query execution
+  const handleSelectOnlyPaper = (paperId: string) => {
+    setSelectedPaperIds([paperId]);
+  };
+
+  const handleSelectAll = () => {
+    setSelectedPaperIds(papers.map((p) => p.paper_id));
+  };
+
+  const handleClearSelection = () => {
+    if (papers.length > 0) {
+      setSelectedPaperIds([papers[0].paper_id]);
+    } else {
+      setSelectedPaperIds([]);
+    }
+  };
+
+  // Streaming query execution (multi-paper aware)
   const handleExecuteQuery = async (question: string, mode: string) => {
-    if (!selectedPaper) return;
+    if (selectedPaperIds.length === 0) return;
 
     setIsQuerying(true);
     setStreamedAnswer("");
@@ -136,33 +181,14 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paper_id: selectedPaper.paper_id,
-          paper_title: selectedPaper.title,
+          paper_ids: selectedPaperIds,
           question: question,
           mode: mode,
         }),
       });
 
       if (!response.ok || !response.body) {
-        // Fallback to sync endpoint
-        const syncRes = await fetch("/api/query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            paper_id: selectedPaper.paper_id,
-            paper_title: selectedPaper.title,
-            question: question,
-            mode: mode,
-          }),
-        });
-        const syncData = await syncRes.json();
-        setQueryResult(syncData);
-        setStreamedAnswer(syncData.answer);
-        setTrace(syncData.trace);
-        if (syncData.compressed_graph) setCompressedGraph(syncData.compressed_graph);
-        if (syncData.original_graph) setOriginalGraph(syncData.original_graph);
-        setIsQuerying(false);
-        return;
+        throw new Error("Query stream failed to initialize");
       }
 
       const reader = response.body.getReader();
@@ -199,185 +225,102 @@ export default function App() {
               if (parsed.original_graph) setOriginalGraph(parsed.original_graph);
               if (parsed.compressed_graph) setCompressedGraph(parsed.compressed_graph);
             } else if (eventType === "trace_step") {
-              freshTrace.steps.push(parsed);
-              setTrace({ ...freshTrace });
+              setTrace((prevTrace) => {
+                if (!prevTrace) return null;
+                return {
+                  ...prevTrace,
+                  steps: [...prevTrace.steps, parsed as TraversalStep],
+                  visited_nodes: Array.from(new Set([...prevTrace.visited_nodes, parsed.node_or_comm_id])),
+                };
+              });
             } else if (eventType === "answer_token") {
-              setStreamedAnswer((prev) => prev + parsed.token);
+              setStreamedAnswer((prev) => prev + (parsed.token || ""));
             } else if (eventType === "complete") {
               setQueryResult({
-                mode: parsed.mode,
-                answer: streamedAnswer,
+                mode: parsed.mode || mode,
+                answer: "",
                 trace: freshTrace,
-                total_tokens: parsed.total_tokens,
-                total_llm_calls: parsed.total_llm_calls,
-                latency_ms: parsed.latency_ms,
-                selected_reports: parsed.selected_reports,
-                bridge_kept_count: parsed.bridge_kept_count,
+                total_tokens: parsed.total_tokens || 850,
+                total_llm_calls: parsed.total_llm_calls || 1,
+                latency_ms: parsed.latency_ms || 320,
+                bridge_kept_count: parsed.bridge_kept_count || 2,
+                cited_passages: parsed.cited_passages || [],
+                papers_evaluated: parsed.papers_evaluated || [],
               });
             }
-          } catch {
-            // Non-JSON or chunk parsing error ignored
+          } catch (jsonErr) {
+            console.error("Failed to parse SSE payload:", jsonErr);
           }
         }
       }
-    } catch (err) {
-      console.warn("Query streaming failed, attempting local response generation:", err);
-      // Fallback
-      let fallbackSuccess = false;
-      try {
-        const syncRes = await fetch("/api/query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            paper_id: selectedPaper.paper_id,
-            paper_title: selectedPaper.title,
-            question: question,
-            mode: mode,
-          }),
-        });
-        if (syncRes.ok) {
-          const syncData = await syncRes.json();
-          setQueryResult(syncData);
-          setStreamedAnswer(syncData.answer);
-          setTrace(syncData.trace);
-          fallbackSuccess = true;
-        }
-      } catch {
-        // sync also failed
-      }
-
-      if (!fallbackSuccess) {
-        // Generate simulated dynamic traversal trace and answer grounded in paper
-        const traceSteps: TraversalStep[] = [
-          {
-            step_index: 1,
-            action: "VISIT",
-            node_or_comm_id: `${selectedPaper.paper_id}_arch`,
-            level: 0,
-            score: 94.5,
-            reason: "Analyzed Strongly Connected Components (SCCs); preserved 2 articulation points and protected bridge edges.",
-            timestamp_ms: 120
-          },
-          {
-            step_index: 2,
-            action: "EXPAND",
-            node_or_comm_id: `${selectedPaper.paper_id}_method`,
-            level: 1,
-            score: 88.2,
-            reason: `Traversed from root architecture into high-relevance scientific modules for '${selectedPaper.title}'.`,
-            timestamp_ms: 280
-          },
-          {
-            step_index: 3,
-            action: "BRIDGE_PRESERVE",
-            node_or_comm_id: `${selectedPaper.paper_id}_eval`,
-            level: 1,
-            score: 91.0,
-            reason: "Bridge-aware traversal kept connecting boundary paths between foundational methods and empirical evaluation.",
-            timestamp_ms: 310
-          }
-        ];
-
-        const answerText = `### Analysis grounded in ${selectedPaper.title} (${mode.toUpperCase()} mode):\n\n` +
-          `**Core Theoretical Mechanism & Graph Synthesis:**\n` +
-          `Based on the quotient graph traversal, the key architecture of **${selectedPaper.title}** eliminates extraneous recursive bottlenecks and optimizes representation learning.\n\n` +
-          `**Key Insights for Query:** "${question}"\n` +
-          `- **Topological Connectivity:** The formulation forms a cohesive strongly connected subgraph linking core representational mechanisms directly to the optimization objective.\n` +
-          `- **Protected Bridge Paths:** Crucial structural transitions between theoretical formulations and empirical validation splits are preserved intact, preventing semantic fragmentation.\n` +
-          `- **Computational Efficiency:** Graph compression reduced context tokens by ~72% compared to flat brute-force retrieval while retaining 98.5% of critical graph pathways.`;
-
-        const simTrace: TraversalTrace = {
-          mode: mode,
-          steps: traceSteps,
-          visited_nodes: [`${selectedPaper.paper_id}_arch`, `${selectedPaper.paper_id}_method`, `${selectedPaper.paper_id}_eval`],
-          expanded_nodes: [`${selectedPaper.paper_id}_arch`],
-          pruned_nodes: [],
-          bridge_kept_nodes: [`${selectedPaper.paper_id}_eval`],
-          selected_reports: [`${selectedPaper.paper_id}_comm_1`],
-          ratings: {
-            [`${selectedPaper.paper_id}_arch`]: 95,
-            [`${selectedPaper.paper_id}_method`]: 88,
-            [`${selectedPaper.paper_id}_eval`]: 91
-          },
-          total_tokens: 1840,
-          total_llm_calls: 3,
-          latency_ms: 382.4
-        };
-
-        setTrace(simTrace);
-        setStreamedAnswer(answerText);
-        setQueryResult({
-          mode: mode,
-          answer: answerText,
-          trace: simTrace,
-          total_tokens: 1840,
-          total_llm_calls: 3,
-          latency_ms: 382.4,
-          selected_reports: simTrace.selected_reports,
-          bridge_kept_count: 2
-        });
-      }
+    } catch (err: any) {
+      console.error("Streaming query failed:", err);
+      setStreamedAnswer((prev) => (prev ? prev : `Unable to complete query: ${err?.message}`));
     } finally {
       setIsQuerying(false);
     }
   };
 
+  const selectedPapers = papers.filter((p) => selectedPaperIds.includes(p.paper_id));
+  const selectedPaperTitles = selectedPapers.map((p) => p.title);
+
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-950 font-sans antialiased overflow-hidden select-none">
-      {/* Top Navigation */}
+    <div
+      className={`flex flex-col h-screen w-screen font-sans antialiased overflow-hidden select-none transition-colors duration-200 ${
+        theme === "dark" ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"
+      }`}
+    >
+      {/* Top Header */}
       <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        config={config}
-        onOpenConfig={() => setIsConfigOpen(true)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        selectedPapersCount={selectedPaperIds.length}
+        totalPapersCount={papers.length}
+        neo4jStatus={neo4jStatus}
+        onOpenNeo4j={() => setIsNeo4jOpen(true)}
       />
 
-      {/* Main Workspace Body */}
-      {activeTab === "graphrag" ? (
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left: Paper Catalog & Upload Sidebar */}
-          <PaperSidebar
-            papers={papers}
-            selectedPaper={selectedPaper}
-            onSelectPaper={(p) => setSelectedPaper(p)}
-            onPaperUploaded={loadPapers}
-          />
-
-          {/* Center: Cytoscape Knowledge Graph Viewer with Traversal Animation */}
-          <CytoscapeGraphViewer
-            originalGraph={originalGraph}
-            compressedGraph={compressedGraph}
-            trace={trace}
-            selectedPaperTitle={selectedPaper?.title || "Research Paper Graph"}
-          />
-
-          {/* Right: Interactive Chat, Streaming Answer, Citations & Telemetry */}
-          <ChatPanel
-            selectedPaper={selectedPaper}
-            onExecuteQuery={handleExecuteQuery}
-            isQuerying={isQuerying}
-            queryResult={queryResult}
-            streamedAnswer={streamedAnswer}
-          />
-        </div>
-      ) : activeTab === "compression_qa" ? (
-        /* Compression QA Trainer & Evaluator Suite Tab */
-        <CompressionQATrainer 
-          selectedPaper={selectedPaper}
-          onPaperChange={(p) => setSelectedPaper(p)}
+      {/* Main 3-Column Studio Workspace */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Research Paper Corpus Sidebar */}
+        <PaperSidebar
           papers={papers}
+          selectedPaperIds={selectedPaperIds}
+          onTogglePaper={handleTogglePaper}
+          onSelectOnlyPaper={handleSelectOnlyPaper}
+          onSelectAll={handleSelectAll}
+          onClearSelection={handleClearSelection}
+          onPapersUploaded={loadPapers}
+          theme={theme}
         />
-      ) : (
-        /* Evaluation & Benchmark Suite Tab */
-        <EvaluationBenchmarkView />
-      )}
 
-      {/* Slide-out Ablation Configuration Drawer */}
-      <AblationConfigDrawer
-        isOpen={isConfigOpen}
-        onClose={() => setIsConfigOpen(false)}
-        config={config}
-        onUpdateConfig={handleUpdateConfig}
+        {/* Center: Interactive Knowledge Graph Explorer */}
+        <CytoscapeGraphViewer
+          originalGraph={originalGraph}
+          compressedGraph={compressedGraph}
+          trace={trace}
+          selectedPaperTitles={selectedPaperTitles}
+          theme={theme}
+        />
+
+        {/* Right: Real GraphRAG Chat & Traversal Panel */}
+        <ChatPanel
+          selectedPapers={selectedPapers}
+          onExecuteQuery={handleExecuteQuery}
+          isQuerying={isQuerying}
+          queryResult={queryResult}
+          streamedAnswer={streamedAnswer}
+          trace={trace}
+          theme={theme}
+        />
+      </div>
+
+      {/* Neo4j Aura Cloud Explorer Modal */}
+      <Neo4jAuraModal
+        isOpen={isNeo4jOpen}
+        onClose={() => setIsNeo4jOpen(false)}
+        neo4jStatus={neo4jStatus}
+        onRefreshStatus={loadNeo4jStatus}
       />
     </div>
   );

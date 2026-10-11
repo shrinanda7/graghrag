@@ -39,14 +39,42 @@ Return ONLY 'GLOBAL' or 'LOCAL'."""
         nodes = paper_data.get("nodes", [])
         edges = paper_data.get("edges", [])
 
-        # If graph empty, create a minimal initial structure from paper name
+        # If graph is missing or empty, return explicit no_indexed_graph status without persisting fabricated entities or calling LLM
         if not nodes:
-            nodes = [
-                {"id": f"{paper_id}_core", "name": paper_title, "type": "Architecture", "description": f"Core methodology of {paper_title}", "source_chunk_ids": ["c1"]},
-                {"id": f"{paper_id}_eval", "name": "Empirical Evaluation", "type": "Metric", "description": "Benchmark metrics and validation", "source_chunk_ids": ["c2"]}
-            ]
-            edges = [{"source": f"{paper_id}_core", "target": f"{paper_id}_eval", "type": "EVALUATED_ON", "weight": 1.0, "source_chunk_ids": ["c1"]}]
-            neo4j_store.save_entities_and_relations(paper_id, nodes, edges, [{"chunk_id": "c1", "section": "Intro", "page": 1, "content": paper_title}])
+            logger.warning(f"No indexed knowledge graph found for paper '{paper_id}' ({paper_title})")
+            return {
+                "status": "no_indexed_graph",
+                "mode": mode,
+                "answer": f"No indexed knowledge graph found for paper '{paper_title}' ({paper_id}). Please index or ingest the paper before querying.",
+                "paper_id": paper_id,
+                "paper_title": paper_title,
+                "original_graph": {"nodes": [], "edges": []},
+                "compressed_graph": {
+                    "nodes": [],
+                    "edges": [],
+                    "diagnostics": {},
+                    "compression_ratio": 0.0,
+                    "articulation_points": [],
+                    "bridges": []
+                },
+                "communities": {},
+                "trace": {
+                    "mode": mode,
+                    "steps": [],
+                    "visited_nodes": [],
+                    "expanded_nodes": [],
+                    "pruned_nodes": [],
+                    "bridge_kept_nodes": [],
+                    "selected_reports": [],
+                    "ratings": {},
+                    "total_tokens": 0,
+                    "total_llm_calls": 0,
+                    "latency_ms": 0,
+                },
+                "total_tokens": 0,
+                "total_llm_calls": 0,
+                "latency_ms": 0,
+            }
 
         # 2. Compress graph (Tarjan SCCs, bridges, articulation points)
         compressed = compressor.compress_graph(nodes, edges)

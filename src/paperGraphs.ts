@@ -854,3 +854,94 @@ export function getPaperGraphData(
     compressed_graph: compressed
   };
 }
+
+export function getMultiPaperGraphData(
+  paperIds: string[]
+): { original_graph: GraphTopology; compressed_graph: GraphTopology } {
+  if (!paperIds || paperIds.length === 0) {
+    return getPaperGraphData("default");
+  }
+  if (paperIds.length === 1) {
+    return getPaperGraphData(paperIds[0]);
+  }
+
+  const allNodesMap = new Map<string, GraphNode>();
+  const allEdgesMap = new Map<string, GraphEdge>();
+
+  for (const pid of paperIds) {
+    const singleData = getPaperGraphData(pid);
+    for (const n of singleData.original_graph.nodes) {
+      if (!allNodesMap.has(n.id)) {
+        allNodesMap.set(n.id, { ...n });
+      }
+    }
+    for (const e of singleData.original_graph.edges) {
+      const key = `${e.source}->${e.target}`;
+      if (!allEdgesMap.has(key)) {
+        allEdgesMap.set(key, { ...e });
+      }
+    }
+  }
+
+  // Cross-paper relational bridges linking foundational papers and user domains
+  const crossPaperBridges: GraphEdge[] = [
+    { source: "transformer", target: "bert", type: "PRETRAINED_ARCHITECTURE", is_bridge: true },
+    { source: "transformer", target: "rag", type: "GENERATOR_BACKBONE", is_bridge: true },
+    { source: "transformer", target: "cnn_lstm_deep", type: "ATTENTION_VS_RECURRENT_BASELINE", is_bridge: true },
+    { source: "cnn_lstm_deep", target: "transformer", type: "SEQUENCE_PARADIGM_EVOLUTION", is_bridge: true },
+    { source: "transformer", target: "phishing_detection_framework", type: "DEEP_ATTENTION_VS_BOOSTING", is_bridge: true },
+    { source: "xgboost_model", target: "transformer", type: "TABULAR_BOOSTING_VS_DEEP_ATTENTION", is_bridge: true },
+    { source: "deepwalk", target: "node2vec", type: "ALGORITHMIC_EVOLUTION", is_bridge: true },
+    { source: "gcn", target: "graphsage", type: "SPECTRAL_TO_INDUCTIVE", is_bridge: true },
+    { source: "gcn", target: "gat", type: "ANISOTROPIC_ATTENTION_EVOLUTION", is_bridge: true },
+    { source: "graphsage", target: "gat", type: "NEIGHBORHOOD_AGGREGATION", is_bridge: true },
+    { source: "bert", target: "cot", type: "PRETRAINED_REASONING_BASE", is_bridge: true },
+    { source: "node2vec", target: "kg_transe", type: "GRAPH_EMBEDDING_PARADIGM", is_bridge: true },
+    { source: "rag", target: "cot", type: "GROUNDED_MULTI_STEP_REASONING", is_bridge: true },
+    { source: "vgg_feature_backbone", target: "transformer", type: "CONVOLUTION_VS_VISION_TRANSFORMER", is_bridge: true },
+    { source: "efficientnet_b4_backbone", target: "transformer", type: "CNN_VS_ATTENTION_FEATURE_EXTRACTION", is_bridge: true },
+  ];
+
+  for (const bridge of crossPaperBridges) {
+    if (allNodesMap.has(bridge.source) && allNodesMap.has(bridge.target)) {
+      const key = `${bridge.source}->${bridge.target}`;
+      allEdgesMap.set(key, bridge);
+    }
+  }
+
+  // Ensure inter-paper connectivity: if two papers lack an explicit bridge, connect their root nodes
+  if (paperIds.length > 1) {
+    for (let i = 0; i < paperIds.length - 1; i++) {
+      const g1 = getPaperGraphData(paperIds[i]);
+      const g2 = getPaperGraphData(paperIds[i + 1]);
+      const root1 = g1.original_graph.nodes[0]?.id;
+      const root2 = g2.original_graph.nodes[0]?.id;
+      if (root1 && root2 && root1 !== root2) {
+        const bridgeKey = `${root1}->${root2}`;
+        if (!allEdgesMap.has(bridgeKey)) {
+          allEdgesMap.set(bridgeKey, {
+            source: root1,
+            target: root2,
+            type: "CROSS_PAPER_PARADIGM_BRIDGE",
+            is_bridge: true,
+            weight: 1.0,
+          });
+        }
+      }
+    }
+  }
+
+  const mergedNodes = Array.from(allNodesMap.values());
+  const mergedEdges = Array.from(allEdgesMap.values());
+  const compressed = buildQuotientGraph(mergedNodes, mergedEdges, "SCC");
+
+  return {
+    original_graph: {
+      nodes: mergedNodes,
+      edges: mergedEdges,
+      node_count: mergedNodes.length,
+      edge_count: mergedEdges.length,
+    },
+    compressed_graph: compressed,
+  };
+}

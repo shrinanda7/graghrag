@@ -1,96 +1,118 @@
 import React from "react";
-import { GitGraph, Activity, Sliders, Database, FileText, CheckCircle2, Award } from "lucide-react";
-import { ConfigState } from "../types";
+import { Network, Database, Sun, Moon } from "lucide-react";
+import { Neo4jStatus } from "../types";
 
 interface HeaderProps {
-  activeTab: "graphrag" | "benchmark" | "compression_qa";
-  setActiveTab: (tab: "graphrag" | "benchmark" | "compression_qa") => void;
-  config: ConfigState | null;
-  onOpenConfig: () => void;
+  theme: "dark" | "light";
+  onToggleTheme: () => void;
+  selectedPapersCount: number;
+  totalPapersCount: number;
+  neo4jStatus: Neo4jStatus | null;
+  onOpenNeo4j: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  activeTab,
-  setActiveTab,
-  config,
-  onOpenConfig,
+  theme,
+  onToggleTheme,
+  selectedPapersCount,
+  totalPapersCount,
+  neo4jStatus,
+  onOpenNeo4j,
 }) => {
+  const isDark = theme === "dark";
+
   return (
-    <header className="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 text-white">
+    <header
+      className={`px-5 py-3 border-b flex items-center justify-between gap-4 transition-colors duration-200 select-none ${
+        isDark
+          ? "bg-slate-950 border-slate-800/80 text-white"
+          : "bg-white border-slate-200 text-slate-900 shadow-xs"
+      }`}
+    >
+      {/* Brand & Context */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <GitGraph className="w-5 h-5 text-white" />
+        <div
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+            isDark
+              ? "bg-indigo-950/70 border border-indigo-700/50 text-indigo-400"
+              : "bg-indigo-50 border border-indigo-200 text-indigo-600"
+          }`}
+        >
+          <Network className="w-5 h-5" />
         </div>
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold tracking-tight">GraphRAG Publication Engine</h1>
-            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              Tarjan & Community RAG
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-sm font-semibold tracking-tight">GraphRAG Paper Studio</h1>
+            <span
+              className={`text-xs ${
+                isDark ? "text-slate-500" : "text-slate-400"
+              }`}
+            >
+              ·
+            </span>
+            <span
+              className={`text-xs tracking-tight ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
+              Tarjan SCC & Bridge-Preserving Graph Retrieval
             </span>
           </div>
-          <p className="text-xs text-slate-400">
-            Iterative SCC Quotient Graphs &bull; Bridge-Aware Pruning &bull; Dynamic Budgeting
-          </p>
+          <div
+            className={`flex items-center gap-2 text-[11px] ${
+              isDark ? "text-slate-400" : "text-slate-500"
+            }`}
+          >
+            <span>
+              {selectedPapersCount === 0
+                ? "No papers selected"
+                : selectedPapersCount === 1
+                ? "1 paper active"
+                : `${selectedPapersCount} papers active (${totalPapersCount} total)`}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>Multi-document synthesis</span>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+      {/* Right Controls */}
+      <div className="flex items-center gap-2.5">
+        {/* Neo4j Aura Cloud Button */}
         <button
-          onClick={() => setActiveTab("graphrag")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
-            activeTab === "graphrag"
-              ? "bg-indigo-600 text-white shadow-sm"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+          onClick={onOpenNeo4j}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+            isDark
+              ? "bg-slate-900 hover:bg-slate-850 border-slate-800 text-slate-200 hover:border-slate-700"
+              : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
           }`}
+          title="Open Neo4j Aura Cloud Explorer & Cypher Console"
         >
-          <GitGraph className="w-3.5 h-3.5" />
-          Interactive Explorer
+          <Database className="w-3.5 h-3.5 text-cyan-500" />
+          <span className="flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                neo4jStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+              }`}
+            />
+            <span className="font-mono text-[11px]">
+              {neo4jStatus?.connected ? "Aura Connected" : "Neo4j Sync"}
+            </span>
+          </span>
         </button>
-        <button
-          onClick={() => setActiveTab("compression_qa")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
-            activeTab === "compression_qa"
-              ? "bg-emerald-500 text-slate-950 shadow-sm"
-              : "text-slate-400 hover:text-emerald-400 hover:bg-slate-700/50"
-          }`}
-        >
-          <Award className="w-3.5 h-3.5" />
-          Compression QA Trainer
-        </button>
-        <button
-          onClick={() => setActiveTab("benchmark")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
-            activeTab === "benchmark"
-              ? "bg-indigo-600 text-white shadow-sm"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
-          }`}
-        >
-          <Activity className="w-3.5 h-3.5" />
-          Benchmark & Ablations (50 Qs)
-        </button>
-      </div>
 
-      <div className="flex items-center gap-3">
-        {config && (
-          <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
-            <span className={`inline-block w-2 h-2 rounded-full ${config.ENABLE_TARJAN_COMPRESSION ? "bg-emerald-400" : "bg-slate-500"}`} />
-            <span>Tarjan: {config.ENABLE_TARJAN_COMPRESSION ? "ON" : "OFF"}</span>
-            <span className="text-slate-600">&bull;</span>
-            <span className={`inline-block w-2 h-2 rounded-full ${config.ENABLE_BRIDGE_AWARE_PRUNING ? "bg-emerald-400" : "bg-slate-500"}`} />
-            <span>Bridges: {config.ENABLE_BRIDGE_AWARE_PRUNING ? "ON" : "OFF"}</span>
-            <span className="text-slate-600">&bull;</span>
-            <span className={`inline-block w-2 h-2 rounded-full ${config.ENABLE_BUDGET_AWARE_TRAVERSAL ? "bg-emerald-400" : "bg-slate-500"}`} />
-            <span>Budget: {config.ENABLE_BUDGET_AWARE_TRAVERSAL ? "ON" : "OFF"}</span>
-          </div>
-        )}
-
+        {/* Theme Switcher */}
         <button
-          onClick={onOpenConfig}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
-          title="Ablation Toggles and Hyperparameters"
+          onClick={onToggleTheme}
+          className={`p-2 rounded-lg border transition-all ${
+            isDark
+              ? "bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white"
+              : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900"
+          }`}
+          title={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+          aria-label="Toggle theme"
         >
-          <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Ablation Settings</span>
+          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
         </button>
       </div>
     </header>

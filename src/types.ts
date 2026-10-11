@@ -102,6 +102,8 @@ export interface QueryResult {
   total_llm_calls: number;
   latency_ms: number;
   bridge_kept_count?: number;
+  cited_passages?: { paper_title: string; text: string; score: number }[];
+  papers_evaluated?: string[];
 }
 
 export interface ConfigState {
@@ -141,4 +143,21 @@ export interface BenchmarkConfigSummary {
   compression_ratio: number;
   graph_preservation: number;
   evaluated_samples: number;
+}
+
+export interface Neo4jStatus {
+  connected: boolean;
+  status: "connected" | "offline" | "error";
+  uri: string;
+  database: string;
+  username: string;
+  instance_id: string;
+  instance_name: string;
+  version?: string;
+  total_nodes?: number;
+  total_relationships?: number;
+  paper_count?: number;
+  entity_count?: number;
+  labels?: string[];
+  error?: string;
 }

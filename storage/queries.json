@@ -1,5 +1,94 @@
 [
   {
+    "id": "q_1791397182464",
+    "timestamp": "2026-10-07T18:19:42.464Z",
+    "paper_ids": [
+      "1706.03762_Attention_Is_All_You_Need"
+    ],
+    "paper_titles": [
+      "Attention Is All You Need"
+    ],
+    "question": "Why does Scaled Dot-Product Attention divide by sqrt(d_k)?",
+    "mode": "ours",
+    "answer_preview": "Scaled Dot-Product Attention Multi-Head Attention Figure 2: (left) Scaled Dot-Product Attention. (right) Multi-Head Attention consists of several atte",
+    "latency_ms": 320,
+    "tokens": 2400
+  },
+  {
+    "id": "q_1791396971134",
+    "timestamp": "2026-10-07T18:16:11.134Z",
+    "paper_ids": [
+      "1706.03762_Attention_Is_All_You_Need",
+      "paper_1789911568626_3bmr",
+      "paper_1791396888345_17w0"
+    ],
+    "paper_titles": [
+      "Received April 28, 2022, accepted May 19, 2022, date of publication May 27, 2022, date of current version June 6, 2022.",
+      "Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods",
+      "Attention Is All You Need"
+    ],
+    "question": "how evaluation works in fundus images classifucation",
+    "mode": "ours",
+    "answer_preview": "B. Goutam et al.: Comprehensive Review of Deep Learning Strategies in Retinal Disease Diagnosis FIGURE 2. Overall DL framework for retinal disease dia",
+    "latency_ms": 320,
+    "tokens": 2400
+  },
+  {
+    "id": "q_1791396901346",
+    "timestamp": "2026-10-07T18:15:01.346Z",
+    "paper_ids": [
+      "1706.03762_Attention_Is_All_You_Need",
+      "paper_1789911568626_3bmr",
+      "paper_1791396888345_17w0"
+    ],
+    "paper_titles": [
+      "Received April 28, 2022, accepted May 19, 2022, date of publication May 27, 2022, date of current version June 6, 2022.",
+      "Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods",
+      "Attention Is All You Need"
+    ],
+    "question": "how these papers are related?",
+    "mode": "ours",
+    "answer_preview": "Received April 28, 2022, accepted May 19, 2022, date of publication May 27, 2022, date of current version June 6, 2022. Digital Object Identifier 10.1",
+    "latency_ms": 320,
+    "tokens": 2400
+  },
+  {
+    "id": "q_1791396848356",
+    "timestamp": "2026-10-07T18:14:08.356Z",
+    "paper_ids": [
+      "1706.03762_Attention_Is_All_You_Need",
+      "paper_1789927908284_fpzm",
+      "paper_1789911568626_3bmr"
+    ],
+    "paper_titles": [
+      "paper3",
+      "Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods",
+      "Attention Is All You Need"
+    ],
+    "question": "how these papers are related?",
+    "mode": "ours",
+    "answer_preview": "Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalis",
+    "latency_ms": 320,
+    "tokens": 2400
+  },
+  {
+    "id": "q_1791396637280",
+    "timestamp": "2026-10-07T18:10:37.280Z",
+    "paper_ids": [
+      "1706.03762_Attention_Is_All_You_Need",
+      "1810.04805_BERT"
+    ],
+    "paper_titles": [
+      "Attention Is All You Need",
+      "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+    ],
+    "question": "How does BERT build on the Transformer architecture?",
+    "mode": "ours",
+    "answer_preview": "1 Introduction Recurrent neural networks, long short-term memory [13] and gated recurrent [7] neural networks in particular, have been firmly establis",
+    "latency_ms": 320,
+    "tokens": 2400
+  },
+  {
     "id": "q_1789972352010_un1h",
     "timestamp": "2026-09-21T06:32:32.010Z",
     "paper_id": "paper_1789927908284_fpzm",

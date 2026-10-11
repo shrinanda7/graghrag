@@ -1,5 +1,5 @@
 import { Paper, GraphTopology, ConfigState, BenchmarkConfigSummary } from "./types";
-import { getPaperGraphData } from "./paperGraphs";
+import { getPaperGraphData, getMultiPaperGraphData } from "./paperGraphs";
 
 export const INITIAL_CONFIG: ConfigState = {
   ENABLE_TARJAN_COMPRESSION: true,
@@ -128,6 +128,10 @@ export const PRELOADED_PAPERS: Paper[] = [
 
 export function generatePaperGraph(paperId: string, customTitle?: string): { original_graph: GraphTopology; compressed_graph: GraphTopology } {
   return getPaperGraphData(paperId, customTitle);
+}
+
+export function generateMultiPaperGraph(paperIds: string[]): { original_graph: GraphTopology; compressed_graph: GraphTopology } {
+  return getMultiPaperGraphData(paperIds);
 }
 
 export const BENCHMARK_CONFIG_SUMMARIES: BenchmarkConfigSummary[] = [

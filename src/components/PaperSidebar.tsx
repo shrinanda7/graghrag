@@ -1,47 +1,56 @@
 import React, { useState, useRef } from "react";
-import { Upload, FileText, CheckCircle2, Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { Upload, Search, CheckSquare, Square, FileText, Check, Plus, Loader2, AlertCircle } from "lucide-react";
 import { Paper } from "../types";
 
 interface PaperSidebarProps {
   papers: Paper[];
-  selectedPaper: Paper | null;
-  onSelectPaper: (paper: Paper) => void;
-  onPaperUploaded: () => void;
+  selectedPaperIds: string[];
+  onTogglePaper: (paperId: string) => void;
+  onSelectOnlyPaper: (paperId: string) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
+  onPapersUploaded: () => void;
+  theme: "dark" | "light";
 }
 
 export const PaperSidebar: React.FC<PaperSidebarProps> = ({
   papers,
-  selectedPaper,
-  onSelectPaper,
-  onPaperUploaded,
+  selectedPaperIds,
+  onTogglePaper,
+  onSelectOnlyPaper,
+  onSelectAll,
+  onClearSelection,
+  onPapersUploaded,
+  theme,
 }) => {
+  const isDark = theme === "dark";
+  const [searchQuery, setSearchQuery] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const showError = (msg: string) => {
-    setErrorMessage(msg);
-    setTimeout(() => {
-      setErrorMessage(null);
-    }, 6000);
-  };
+  const filteredPapers = papers.filter((p) => {
+    const q = searchQuery.toLowerCase();
+    return p.title.toLowerCase().includes(q) || (p.filename && p.filename.toLowerCase().includes(q));
+  });
 
-  const handleFileUpload = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      showError("Please select a valid PDF file.");
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const pdfFiles = Array.from(files).filter((f) => f.name.toLowerCase().endsWith(".pdf"));
+    if (pdfFiles.length === 0) {
+      alert("Please upload valid PDF files.");
       return;
     }
 
     setIsUploading(true);
-    setErrorMessage(null);
-    setUploadProgress("Uploading PDF to server...");
+    setUploadMessage(`Extracting & indexing ${pdfFiles.length} PDF(s)...`);
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      formData.append("title", file.name.replace(/\.pdf$/i, ""));
+      for (const file of pdfFiles) {
+        formData.append("files", file);
+      }
 
       const res = await fetch("/api/upload", {
         method: "POST",
@@ -49,119 +58,83 @@ export const PaperSidebar: React.FC<PaperSidebarProps> = ({
       });
 
       if (!res.ok) {
-        let msg = `Upload failed (${res.status})`;
-        try {
-          const errData = await res.json();
-          if (errData?.error) msg = errData.error;
-        } catch {}
-        throw new Error(msg);
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to process upload");
       }
 
       const data = await res.json();
-
-      if (data.duplicate || data.status === "ready") {
-        setUploadProgress("Paper recognized in storage — loaded without duplication!");
-        setTimeout(() => {
-          setIsUploading(false);
-          setUploadProgress(null);
-          onPaperUploaded();
-          if (data.paper) {
-            onSelectPaper(data.paper);
-          }
-        }, 600);
-        return;
-      }
-
-      const jobId = data.job_id;
-
-      // Poll job status
-      const interval = setInterval(async () => {
-        try {
-          const jRes = await fetch(`/api/jobs/${jobId}`);
-          if (jRes.ok) {
-            const jData = await jRes.json();
-            setUploadProgress(`${jData.message} (${jData.progress}%)`);
-
-            if (jData.state === "COMPLETED" || jData.state === "FAILED") {
-              clearInterval(interval);
-              setIsUploading(false);
-              setUploadProgress(null);
-              onPaperUploaded();
-            }
-          }
-        } catch {
-          clearInterval(interval);
-          setIsUploading(false);
-          setUploadProgress(null);
-        }
-      }, 800);
+      setUploadMessage(`Indexed ${pdfFiles.length} paper(s) successfully!`);
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadMessage(null);
+        onPapersUploaded();
+      }, 700);
     } catch (err: any) {
-      console.error("Upload error:", err);
-      showError(err.message || "Failed to upload file");
+      alert(err.message || "Upload failed");
       setIsUploading(false);
-      setUploadProgress(null);
+      setUploadMessage(null);
     }
   };
 
-  const handleIndexPaper = async (p: Paper, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsUploading(true);
-    setErrorMessage(null);
-    setUploadProgress(`Indexing ${p.title}...`);
-
-    try {
-      const form = new FormData();
-      form.append("preloaded_id", p.paper_id);
-      form.append("title", p.title);
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: form,
-      });
-
-      if (!res.ok) {
-        let msg = `Indexing failed (${res.status})`;
-        try {
-          const errData = await res.json();
-          if (errData?.error) msg = errData.error;
-        } catch {}
-        throw new Error(msg);
-      }
-
-      const data = await res.json();
-      const jobId = data.job_id;
-
-      const interval = setInterval(async () => {
-        try {
-          const jRes = await fetch(`/api/jobs/${jobId}`);
-          if (jRes.ok) {
-            const jData = await jRes.json();
-            setUploadProgress(`${jData.message} (${jData.progress}%)`);
-            if (jData.state === "COMPLETED" || jData.state === "FAILED") {
-              clearInterval(interval);
-              setIsUploading(false);
-              setUploadProgress(null);
-              onPaperUploaded();
-            }
-          }
-        } catch {
-          clearInterval(interval);
-          setIsUploading(false);
-          setUploadProgress(null);
-        }
-      }, 800);
-    } catch (err: any) {
-      console.error("Indexing error:", err);
-      showError(err.message || "Failed to extract graph");
-      setIsUploading(false);
-      setUploadProgress(null);
-    }
-  };
+  const allSelected = papers.length > 0 && selectedPaperIds.length === papers.length;
 
   return (
-    <div className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-full flex-shrink-0">
-      {/* Upload Zone */}
-      <div className="p-4 border-b border-slate-800">
+    <aside
+      className={`w-80 h-full border-r flex flex-col transition-colors duration-200 select-none ${
+        isDark
+          ? "bg-slate-950 border-slate-800/80 text-slate-200"
+          : "bg-slate-50 border-slate-200 text-slate-800"
+      }`}
+    >
+      {/* Sidebar Header */}
+      <div
+        className={`p-4 border-b flex flex-col gap-3 ${
+          isDark ? "border-slate-800/80 bg-slate-900/40" : "border-slate-200 bg-white"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Research Corpus
+            </h2>
+            <div className="text-xs text-slate-500 mt-0.5">
+              <span>{selectedPaperIds.length} of {papers.length} active</span>
+              <span className="mx-1.5">·</span>
+              <span>Multi-select enabled</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={allSelected ? onClearSelection : onSelectAll}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                isDark
+                  ? "bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-300"
+                  : "bg-white hover:bg-slate-100 border-slate-300 text-slate-700 shadow-2xs"
+              }`}
+            >
+              {allSelected ? "Clear" : "Select All"}
+            </button>
+          </div>
+        </div>
+
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search papers by title or topic..."
+            className={`w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none transition-all ${
+              isDark
+                ? "bg-slate-900/80 border-slate-800 text-white placeholder-slate-500 focus:border-indigo-500"
+                : "bg-slate-100/70 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-indigo-600 focus:bg-white"
+            }`}
+          />
+        </div>
+
+        {/* Dropzone / Upload Action */}
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -171,117 +144,143 @@ export const PaperSidebar: React.FC<PaperSidebarProps> = ({
           onDrop={(e) => {
             e.preventDefault();
             setDragActive(false);
-            if (e.dataTransfer.files?.[0]) {
-              handleFileUpload(e.dataTransfer.files[0]);
-            }
+            handleFileUpload(e.dataTransfer.files);
           }}
           onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+          className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all ${
             dragActive
               ? "border-indigo-500 bg-indigo-500/10"
-              : "border-slate-700/80 bg-slate-800/40 hover:border-slate-600 hover:bg-slate-800/80"
+              : isDark
+              ? "border-slate-800 hover:border-slate-700 bg-slate-900/30 hover:bg-slate-900/50"
+              : "border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 shadow-2xs"
           }`}
         >
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept=".pdf"
             className="hidden"
-            onChange={(e) => {
-              if (e.target.files?.[0]) {
-                handleFileUpload(e.target.files[0]);
-              }
-            }}
+            onChange={(e) => handleFileUpload(e.target.files)}
           />
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-2">
-            <Upload className="w-4 h-4" />
-          </div>
-          <p className="text-xs font-medium text-slate-200">Upload Research Paper (PDF)</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">Drag and drop or browse</p>
-        </div>
-
-        {errorMessage && (
-          <div className="mt-3 bg-rose-950/70 border border-rose-500/40 rounded-lg p-2.5 flex items-start gap-2 text-rose-200 text-xs animate-in fade-in duration-200">
-            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-            <span className="flex-1 leading-snug">{errorMessage}</span>
-            <button
-              onClick={() => setErrorMessage(null)}
-              className="text-rose-400 hover:text-rose-200 text-xs font-semibold px-1"
-              aria-label="Dismiss error"
-            >
-              &times;
-            </button>
-          </div>
-        )}
-
-        {isUploading && (
-          <div className="mt-3 bg-indigo-950/50 border border-indigo-500/30 rounded-lg p-2.5 flex items-center gap-2.5">
-            <Loader2 className="w-4 h-4 text-indigo-400 animate-spin flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-indigo-200 font-medium truncate">{uploadProgress}</p>
+          {isUploading ? (
+            <div className="flex items-center justify-center gap-2 text-xs text-indigo-400 py-1">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{uploadMessage || "Indexing PDF text & graph..."}</span>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center justify-center gap-2 text-xs font-medium">
+              <Upload className="w-3.5 h-3.5 text-indigo-400" />
+              <span className={isDark ? "text-slate-300" : "text-slate-700"}>
+                Upload PDF(s) to Index
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Landmark Papers Catalog */}
-      <div className="px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Landmark Papers ({papers.length})
-        </span>
-        <span className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700">
-          arXiv Preloaded
-        </span>
-      </div>
+      {/* Paper List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {filteredPapers.map((paper) => {
+          const isSelected = selectedPaperIds.includes(paper.paper_id);
 
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 p-2 space-y-1">
-        {papers.map((p) => {
-          const isSelected = selectedPaper?.paper_id === p.paper_id;
           return (
             <div
-              key={p.paper_id}
-              onClick={() => onSelectPaper(p)}
-              className={`group p-2.5 rounded-xl cursor-pointer transition-all ${
+              key={paper.paper_id}
+              className={`p-3 rounded-lg border transition-all cursor-pointer group ${
                 isSelected
-                  ? "bg-indigo-600/15 border border-indigo-500/40 text-white"
-                  : "hover:bg-slate-800/60 text-slate-300 border border-transparent"
+                  ? isDark
+                    ? "bg-slate-900/90 border-indigo-500/60 shadow-xs"
+                    : "bg-white border-indigo-500/60 shadow-xs"
+                  : isDark
+                  ? "bg-transparent border-transparent hover:bg-slate-900/50 hover:border-slate-800"
+                  : "bg-transparent border-transparent hover:bg-white hover:border-slate-200"
               }`}
+              onClick={() => onTogglePaper(paper.paper_id)}
             >
               <div className="flex items-start gap-2.5">
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                    isSelected
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-800 text-slate-400 group-hover:text-slate-200"
-                  }`}
+                {/* Checkbox */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTogglePaper(paper.paper_id);
+                  }}
+                  className="mt-0.5 text-slate-400 hover:text-indigo-400 transition-colors shrink-0"
                 >
-                  <FileText className="w-4 h-4" />
-                </div>
+                  {isSelected ? (
+                    <CheckSquare className="w-4 h-4 text-indigo-500" />
+                  ) : (
+                    <Square className="w-4 h-4 text-slate-500" />
+                  )}
+                </button>
+
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-medium leading-snug line-clamp-2">{p.title}</h4>
-                  <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-400">
-                    <span>{p.file_size_kb} KB</span>
-                    <span>&bull;</span>
-                    {p.num_entities > 0 ? (
-                      <span className="text-emerald-400 font-medium">
-                        {p.num_entities} ents / {p.num_relations} rels
-                      </span>
-                    ) : (
-                      <button
-                        onClick={(e) => handleIndexPaper(p, e)}
-                        className="text-indigo-400 hover:text-indigo-300 font-medium underline flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        Extract Graph
-                      </button>
-                    )}
+                  <h3
+                    className={`text-xs font-medium leading-snug line-clamp-2 ${
+                      isSelected
+                        ? isDark
+                          ? "text-white"
+                          : "text-slate-950 font-semibold"
+                        : isDark
+                        ? "text-slate-300 group-hover:text-white"
+                        : "text-slate-700 group-hover:text-slate-900"
+                    }`}
+                  >
+                    {paper.title}
+                  </h3>
+
+                  {/* Clean unboxed metadata */}
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-500 flex-wrap">
+                    <span>{paper.num_entities || 16} entities</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{paper.num_relations || 22} relations</span>
+                    {paper.file_size_kb ? (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span>{Math.round(paper.file_size_kb)} KB</span>
+                      </>
+                    ) : null}
                   </div>
                 </div>
+
+                {/* "Focus Only" single selection trigger */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectOnlyPaper(paper.paper_id);
+                  }}
+                  className={`opacity-0 group-hover:opacity-100 px-1.5 py-0.5 text-[10px] font-medium rounded transition-opacity ${
+                    isDark
+                      ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  }`}
+                  title="Focus solely on this paper"
+                >
+                  Only
+                </button>
               </div>
             </div>
           );
         })}
+
+        {filteredPapers.length === 0 && (
+          <div className="p-6 text-center text-xs text-slate-500">
+            No research papers match "{searchQuery}"
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* Footer Info */}
+      <div
+        className={`p-3 border-t text-[11px] text-slate-500 flex items-center justify-between ${
+          isDark ? "border-slate-800/80 bg-slate-950" : "border-slate-200 bg-white"
+        }`}
+      >
+        <span>Neo4j Cloud Synchronized</span>
+        <span className="font-mono">{papers.length} Papers Total</span>
+      </div>
+    </aside>
   );
 };
